@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+<title>Big Zip</title>
+
+
+<!-- JQuery's includes -->
+<script type="text/javascript" src="../jquery-1.8.3.min.js"></script>
+
+<!-- Martin's includes -->
+<script type="text/javascript" src="helper.js"></script>
+<script type="text/javascript" src="zipParse.js"></script>
+<script type="text/javascript" src="../../jszip.js"></script>
+<script type="text/javascript" src="../../jszip-inflate.js"></script>
+<script type="text/javascript" src="../../jszip-load.js"></script>
+<script type="text/vbscript" src="iedataload.vbs"></script>
+
+
+</head>
+
+<body>
+
+<H1>Zip Partial Load Demo</H1>
+
+<div id="allVisDiv" style="margin: 0 auto; width: 90%; position: relative; clear: both; overflow: hidden; display: none;">
+
+</div>
+
+
+
+<!--   <div style="width: 100%; clear: both;"></div> -->
+
+ <script type="text/javascript">
+
+     var file ="pagecounts-20130101-000000.zip"; // downloadable from http://dumps.wikimedia.org/other/pagecounts-raw/2013/2013-01/. Must be rezipped as a .zip rather than a .gz
+
+	 var asyncMethod = function (xhr) {
+         var textLoaded = Helper.getText (xhr);
+         alert ("zipped: "+(textLoaded.length | textLoaded.byteLength)+" bytes\ncheck memory use in task manager");
+         var zip = new JSZip (textLoaded, {base64:false, noInflate:true});
+         console.log ("unzipped ", zip, zip.files);
+
+         var inzipfile = "pagecounts-20130101-000000/pagecounts-20130101-000000";
+         ZipParse.set ({ignoreHeaderLines:0, fieldsTerminatedBy:" ", linesTerminatedBy:"\n", fieldsEnclosedBy: "", readFields: [false, false, true, true]});
+         zip.zipEntries.readLocalFile (inzipfile, ZipParse.zipStreamSVParser2);
+     };
+
+     Helper.xhr2 (file, 'text/plain; charset=x-user-defined', asyncMethod);
+
+ </script>
+
+</body>
+</html>

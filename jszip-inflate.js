@@ -326,12 +326,19 @@ function zip_HuftBuild(b,	// code lengths in bits (all assumed <= BMAX)
 
 
 /* routines (inflate) */
+    var GET_BYTE;   // will be set to point to either GET_BYTE_STR or GET_BYTE_ARR dependent on type of object zip data is in (string or uint8array)
 
-function zip_GET_BYTE() {
-    if(zip_inflate_data.length == zip_inflate_pos)
-	return -1;
-    return zip_inflate_data.charCodeAt(zip_inflate_pos++) & 0xff;
-}
+    function zip_GET_BYTE_STR() {
+        if(zip_inflate_data.length == zip_inflate_pos)
+            return -1;
+        return zip_inflate_data.charCodeAt(zip_inflate_pos++) & 0xff;
+    }
+
+    function zip_GET_BYTE_ARR() {
+        if(zip_inflate_data.length == zip_inflate_pos)
+            return -1;
+        return zip_inflate_data[zip_inflate_pos++];
+    }
 
 function zip_NEEDBITS(n) {
     while(zip_bit_len < n) {
@@ -656,6 +663,14 @@ function zip_inflate_start() {
     zip_tl = null;
 }
 
+function zip_inflate_dtype (str){
+    if (typeof str == "string") {
+        zip_GET_BYTE = zip_GET_BYTE_STR;
+    } else if (str instanceof Uint8Array) {
+       zip_GET_BYTE = zip_GET_BYTE_ARR;
+    }
+}
+
 function zip_inflate_internal(buff, off, size) {
     // decompress an inflated entry
     var n, i;
@@ -742,24 +757,42 @@ function zip_inflate_internal(buff, off, size) {
     return n;
 }
 
-function zip_inflate(str) {
-    var out, buff;
-    var i, j;
+    // mjg
+    function zip_full_read (inflation_method) {
+        var out = [], buff = new Array(1024);
+        var i, j;
+        var bigout = [];
+        var k = 0;
 
-    zip_inflate_start();
-    zip_inflate_data = str;
-    zip_inflate_pos = 0;
-
-    buff = new Array(1024);
-    out = "";
-    while((i = zip_inflate_internal(buff, 0, buff.length)) > 0) {
-	for(j = 0; j < i; j++)
-	    out += String.fromCharCode(buff[j]);
+        while((i = inflation_method(buff, 0, buff.length)) > 0) {
+            out.length = 0;
+            for(j = 0; j < i; j++) {
+                out[j] = String.fromCharCode(buff[j]);
+            }
+            // console.log (out.length);
+            bigout[k] = out.join("");
+            k++;
+        }
+        zip_inflate_data = null; // G.C.
+        return bigout.join("");
     }
-    zip_inflate_data = null; // G.C.
-    return out;
-}
 
+    // mjg
+    function zip_inflate (stream, range, streamProcessor) { // range is range.start and range.end
+        //console.log ("inflating zip file v4 stream delimited");
+        if (streamProcessor === undefined) {
+            streamProcessor = zip_full_read;
+        }
+
+        zip_inflate_start();
+        zip_inflate_dtype (stream);
+        zip_inflate_data = stream;
+        zip_inflate_pos = (range ? range.start : 0);
+
+        var results = streamProcessor (zip_inflate_internal);
+        zip_inflate_data = null; // G.C.
+        return results;
+    }
 //
 // end of the script of Masanao Izumo.
 //
