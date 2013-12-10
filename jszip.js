@@ -56,7 +56,7 @@ JSZip.defaults = {
    binary: false,
    dir: false,
    date: null,
-   compression: null
+    compression: null
 };
 
 
@@ -81,9 +81,6 @@ JSZip.prototype = (function () {
        */
       asText : function () {
          var result = this.data;
-         if (result === null || typeof result === "undefined") {
-            return "";
-         }
          if (this.options.base64) {
             result = JSZipBase64.decode(result);
          }
@@ -98,9 +95,6 @@ JSZip.prototype = (function () {
        */
       asBinary : function () {
          var result = this.data;
-         if (result === null || typeof result === "undefined") {
-            return "";
-         }
          if (this.options.base64) {
             result = JSZipBase64.decode(result);
          }
@@ -173,7 +167,6 @@ JSZip.prototype = (function () {
       }
       o = extend(o, JSZip.defaults);
       o.date = o.date || new Date();
-      if (o.compression !== null) o.compression = o.compression.toUpperCase();
 
       return o;
    };
@@ -195,11 +188,7 @@ JSZip.prototype = (function () {
 
       o = prepareFileAttrs(o);
 
-      if (o.dir || data === null || typeof data === "undefined") {
-         o.base64 = false;
-         o.binary = false;
-         data = null;
-      } else if (JSZip.support.uint8array && data instanceof Uint8Array) {
+      if (JSZip.support.uint8array && data instanceof Uint8Array) {
          o.base64 = false;
          o.binary = true;
          data = JSZip.utils.uint8Array2String(data);
@@ -257,7 +246,7 @@ JSZip.prototype = (function () {
             folderAdd.call(this, parent);
          }
 
-         fileAdd.call(this, name, null, {dir:true});
+         fileAdd.call(this, name, '', {dir:true});
       }
       return this.files[name];
    };
@@ -295,15 +284,8 @@ JSZip.prototype = (function () {
       dosDate = dosDate << 5;
       dosDate = dosDate | o.date.getDate();
 
-      var hasData = data !== null && data.length !== 0;
-
-      compressionType = o.compression || compressionType;
-      if (!JSZip.compressions[compressionType]) {
-         throw compressionType + " is not a valid compression method !";
-      }
-
       var compression    = JSZip.compressions[compressionType];
-      var compressedData = hasData ? compression.compress(data) : '';
+      var compressedData = compression.compress(data);
 
       var header = "";
 
@@ -313,17 +295,17 @@ JSZip.prototype = (function () {
       // set bit 11 if utf8
       header += useUTF8 ? "\x00\x08" : "\x00\x00";
       // compression method
-      header += hasData ? compression.magic : JSZip.compressions['STORE'].magic;
+      header += compression.magic;
       // last mod file time
       header += decToHex(dosTime, 2);
       // last mod file date
       header += decToHex(dosDate, 2);
       // crc-32
-      header += hasData ? decToHex(this.crc32(data), 4) : '\x00\x00\x00\x00';
+      header += decToHex(this.crc32(data), 4);
       // compressed size
-      header += hasData ? decToHex(compressedData.length, 4) : '\x00\x00\x00\x00';
+      header += decToHex(compressedData.length, 4);
       // uncompressed size
-      header += hasData ? decToHex(data.length, 4) : '\x00\x00\x00\x00';
+      header += decToHex(data.length, 4);
       // file name length
       header += decToHex(utfEncodedFileName.length, 2);
       // extra field length
@@ -508,7 +490,7 @@ JSZip.prototype = (function () {
             // internal file attributes TODO
             "\x00\x00" +
             // external file attributes
-            (this.files[name].options.dir===true?"\x10\x00\x00\x00":"\x00\x00\x00\x00")+
+            (this.files[name].dir===true?"\x10\x00\x00\x00":"\x00\x00\x00\x00")+
             // relative offset of local header
             decToHex(fileOffset, 4) +
             // file name
@@ -544,6 +526,7 @@ JSZip.prototype = (function () {
 
          var zip = fileData + dirData + dirEnd;
 
+
          switch(options.type.toLowerCase()) {
             case "uint8array" :
                return JSZip.utils.string2Uint8Array(zip);
@@ -566,10 +549,9 @@ JSZip.prototype = (function () {
        */
       crc32 : function(str, crc) {
 
-         if (str === "" || str.length === 0 || typeof str === "undefined") {
+         if (str === "" || typeof str === "undefined") {
             return 0;
          }
-         var uint8 = str instanceof Uint8Array;
 
          var table = [
             0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA,
@@ -644,7 +626,7 @@ JSZip.prototype = (function () {
 
          crc = crc ^ (-1);
          for( var i = 0, iTop = str.length; i < iTop; i++ ) {
-            y = uint8 ? ( crc ^ str[i]) : ( crc ^ str.charCodeAt( i ) ) & 0xFF;
+            y = ( crc ^ str.charCodeAt( i ) ) & 0xFF;
             x = table[y];
             crc = ( crc >>> 8 ) ^ x;
          }
@@ -668,6 +650,7 @@ JSZip.prototype = (function () {
        * http://www.webtoolkit.info/javascript-utf8.html
        */
       utf8encode : function (string) {
+         string = string.replace(/\r\n/g,"\n");
          var utftext = "";
 
          for (var n = 0; n < string.length; n++) {
@@ -741,21 +724,8 @@ JSZip.compressions = {
       compress : function (content) {
          return content; // no compression
       },
-      uncompress : function (content, range, streamFunction) {
-          //console.log ("con", content, range, typeof content);
-         if (range === undefined) {
-            return content; // no compression
-         }
-
-         if (typeof content == "string") {
-             return content.slice (range.start, range.end);
-         }
-
-         if (content instanceof Uint8Array) {
-             return (content.subarray (range.start, range.end));
-         }
-
-          return content;
+      uncompress : function (content) {
+         return content; // no compression
       }
    }
 };
@@ -805,7 +775,6 @@ JSZip.support = {
 JSZip.utils = {
 
     buildString: function (str) {
-        JSZip.utils.init();
         var result = [], bigresult = [];
         var k = 0;
 
@@ -813,7 +782,7 @@ JSZip.utils = {
             var c = i % 1024;
             var val = str.charCodeAt (i);
             //result [c] = (val <= 0xff ? str.charAt(i) : String.fromCharCode(val & 0xff));
-            result [c] = (val <= 0xff ? str.charAt(i) : JSZip.utils.ccStrs[val & 0xff]);
+            result [c] = (val <= 0xff ? str.charAt(i) : this.ccStrs[val & 0xff]);
             if (c === 1023 || i === str.length - 1) {
                 bigresult[k] = result.join("");
                 result.length = 0;
@@ -821,15 +790,16 @@ JSZip.utils = {
             }
         }
 
-        return bigresult.join("");
+        var final = bigresult.join("");
+        return final;
     },
 
     ccStrs: [],
     init: function () {
         // make cache of first 256 char codes
-        if (JSZip.utils.ccStrs.length === 0) {
+        if (this.ccStrs.length === 0) {
             for (var n = 0; n < 256; n++) {
-                JSZip.utils.ccStrs.push (String.fromCharCode (n));
+                this.ccStrs.push (String.fromCharCode (n));
             }
         }
     },
@@ -846,59 +816,58 @@ JSZip.utils = {
        }
        return str;
     },
-    /**
-     * Create a Uint8Array from the string.
-     * @param {string} str the string to transform.
-     * @return {Uint8Array} the typed array.
-     * @throws {Error} an Error if the browser doesn't support the requested feature.
-     */
-    string2Uint8Array : function (str) {
-        if (!JSZip.support.uint8array) {
-            throw new Error("Uint8Array is not supported by this browser");
-        }
-        var buffer = new ArrayBuffer(str.length);
-        var bufferView = new Uint8Array(buffer);
-        for(var i = 0; i < str.length; i++) {
-            bufferView[i] = str.charCodeAt(i);
-        }
+   /**
+    * Create a Uint8Array from the string.
+    * @param {string} str the string to transform.
+    * @return {Uint8Array} the typed array.
+    * @throws {Error} an Error if the browser doesn't support the requested feature.
+    */
+   string2Uint8Array : function (str) {
+      if (!JSZip.support.uint8array) {
+         throw new Error("Uint8Array is not supported by this browser");
+      }
+      var buffer = new ArrayBuffer(str.length);
+      var bufferView = new Uint8Array(buffer);
+      for(var i = 0; i < str.length; i++) {
+         bufferView[i] = str.charCodeAt(i);
+      }
 
-        return bufferView;
-    },
+      return bufferView;
+   },
 
-    /**
-     * Create a string from the Uint8Array.
-     * @param {Uint8Array} array the array to transform.
-     * @return {string} the string.
-     * @throws {Error} an Error if the browser doesn't support the requested feature.
-     */
-    uint8Array2String : function (array, start, end) {
+   /**
+    * Create a string from the Uint8Array.
+    * @param {Uint8Array} array the array to transform.
+    * @return {string} the string.
+    * @throws {Error} an Error if the browser doesn't support the requested feature.
+    */
+   uint8Array2String : function (array, start, end) {
 
-        if (!JSZip.support.uint8array) {
-            throw new Error("Uint8Array is not supported by this browser");
-        }
-        JSZip.utils.init();
-        start = start | 0;
-        if (end == undefined) {
-            end = array.length;
-        }
+      if (!JSZip.support.uint8array) {
+         throw new Error("Uint8Array is not supported by this browser");
+      }
 
-        var result = [];
-        var bigresult = [];
-        var k = 0;
+       start = start | 0;
+       if (end == undefined) {
+           end = array.length;
+       }
 
-        for (var i = start; i < end; i++) {
-            var c = i % 1024;
-            var val = JSZip.utils.ccStrs [array[i]];
-            result [c] = val;
-            if (c === 1023 || i === end - 1) {
-                bigresult[k] = result.join("");
-                result.length = 0;
-                k++;
-            }
-        }
+       var result = [];
+       var bigresult = [];
+       var k = 0;
 
-        return bigresult.join("");
-    },
+       for (var i = start; i < end; i++) {
+           var c = i % 1024;
+           result [c] = this.ccStrs [array[i]];
+           if (c === 1023 || i === end - 1) {
+               bigresult[k] = result.join("");
+               result.length = 0;
+               k++;
+           }
+       }
+
+       return bigresult.join("");
+   },
    /**
     * Create a blob from the given string.
     * @param {string} str the string to transform.

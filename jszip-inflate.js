@@ -326,19 +326,19 @@ function zip_HuftBuild(b,	// code lengths in bits (all assumed <= BMAX)
 
 
 /* routines (inflate) */
-    var GET_BYTE;   // will be set to point to either GET_BYTE_STR or GET_BYTE_ARR dependent on type of object zip data is in (string or uint8array)
+var GET_BYTE;   // will be set to point to either GET_BYTE_STR or GET_BYTE_ARR dependent on type of object zip data is in (string or uint8array)
 
-    function zip_GET_BYTE_STR() {
-        if(zip_inflate_data.length == zip_inflate_pos)
-            return -1;
-        return zip_inflate_data.charCodeAt(zip_inflate_pos++) & 0xff;
-    }
+function zip_GET_BYTE_STR() {
+    if(zip_inflate_data.length == zip_inflate_pos)
+	return -1;
+    return zip_inflate_data.charCodeAt(zip_inflate_pos++) & 0xff;
+}
 
-    function zip_GET_BYTE_ARR() {
-        if(zip_inflate_data.length == zip_inflate_pos)
-            return -1;
-        return zip_inflate_data[zip_inflate_pos++];
-    }
+function zip_GET_BYTE_ARR() {
+    if(zip_inflate_data.length == zip_inflate_pos)
+        return -1;
+    return zip_inflate_data[zip_inflate_pos++];
+}
 
 function zip_NEEDBITS(n) {
     while(zip_bit_len < n) {
@@ -757,7 +757,7 @@ function zip_inflate_internal(buff, off, size) {
     return n;
 }
 
-    // mjg
+
     function zip_full_read (inflation_method) {
         var out = [], buff = new Array(1024);
         var i, j;
@@ -777,20 +777,22 @@ function zip_inflate_internal(buff, off, size) {
         return bigout.join("");
     }
 
-    // mjg
-    function zip_inflate (stream, range, streamProcessor) { // range is range.start and range.end
+
+    function zip_inflate (reader, streamProcessor) {
         //console.log ("inflating zip file v4 stream delimited");
         if (streamProcessor === undefined) {
             streamProcessor = zip_full_read;
         }
 
         zip_inflate_start();
-        zip_inflate_dtype (stream);
-        zip_inflate_data = stream;
-        zip_inflate_pos = (range ? range.start : 0);
+        zip_inflate_dtype (reader.stream);
+        zip_inflate_data = reader.stream;
+        zip_inflate_pos = reader.index;
 
         var results = streamProcessor (zip_inflate_internal);
+
         zip_inflate_data = null; // G.C.
+
         return results;
     }
 //

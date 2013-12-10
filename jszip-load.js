@@ -52,20 +52,20 @@ Dual licenced under the MIT license or GPLv3. See LICENSE.markdown.
     */
    function StreamReader(stream) {
       this.stream = "";
-       if (JSZip.support.uint8array && stream instanceof Uint8Array) {
-           console.log ("Source is already Uint8Array");
-           this.stream = stream;
-           //this.stream = JSZip.utils.uint8Array2String(stream);
-       } else if (JSZip.support.arraybuffer && stream instanceof ArrayBuffer) {
-           console.log ("Making Uint8Array view over source ArrayBuffer");
-           this.stream = new Uint8Array(stream);
-           //this.stream = JSZip.utils.uint8Array2String(bufferView);
-       } else {
-           console.log ("Turning source String into binary.");
-           this.stream = JSZip.utils.string2binary(stream);
-       }
-       this.index = 0;
-       this.uint8 = (window.Uint8Array !== undefined) && (this.stream instanceof Uint8Array);
+      if (JSZip.support.uint8array && stream instanceof Uint8Array) {
+          console.log ("Source is already Uint8Array");
+          this.stream = stream;
+         //this.stream = JSZip.utils.uint8Array2String(stream);
+      } else if (JSZip.support.arraybuffer && stream instanceof ArrayBuffer) {
+          console.log ("Making Uint8Array view over source ArrayBuffer");
+          this.stream = new Uint8Array(stream);
+         //this.stream = JSZip.utils.uint8Array2String(bufferView);
+      } else {
+          console.log ("Turning source String into binary.");
+         this.stream = JSZip.utils.string2binary(stream);
+      }
+      this.index = 0;
+      this.uint8 = (window.Uint8Array !== undefined) && (this.stream instanceof Uint8Array);
 
        // i do this as a choice here as byteAt gets called a lot, so just do the unit8 test once here
        StreamReader.prototype.byteAt = (this.uint8) ?
@@ -138,14 +138,14 @@ Dual licenced under the MIT license or GPLv3. See LICENSE.markdown.
        * @return {string} the corresponding string.
        */
       readString : function (size) {
-          this.checkOffset(size);
-          // this will work because the constructor applied the "& 0xff" mask.
-          var result = this.uint8
-                  ? JSZip.utils.uint8Array2String (this.stream, this.index, this.index + size)
-                  : this.stream.slice(this.index, this.index + size)
-              ;
-          this.index += size;
-          return result;
+         this.checkOffset(size);
+         // this will work because the constructor applied the "& 0xff" mask.
+         var result = this.uint8
+            ? JSZip.utils.uint8Array2String (this.stream, this.index, this.index + size)
+            : this.stream.slice(this.index, this.index + size)
+         ;
+         this.index += size;
+         return result;
       },
       /**
        * Get the next date.
@@ -248,19 +248,19 @@ Dual licenced under the MIT license or GPLv3. See LICENSE.markdown.
             throw new Error("Bug or corrupted zip : didn't get enough informations from the central directory " +
                             "(compressedSize == -1 || uncompressedSize == -1)");
          }
+
+         //var fileStats = {start: reader.index, cdata: reader.stream, reader: reader}; // Basically a position in the entire zip file
          //this.compressedFileData = reader.readString(this.compressedSize);
          compression = findCompression(this.compressionMethod);
-
          if (compression === null) { // no compression found
             throw new Error("Corrupted zip : compression " + pretty(this.compressionMethod) +
                             " unknown (inner file : " + this.fileName + ")");
          }
-         //this.uncompressedFileData = compression.uncompress(this.compressedFileData);
-          this.uncompressedFileData = compression.uncompress (reader.stream, {start: reader.index, end: reader.index + this.compressedSize}, this.streamFunction);
+          this.uncompressedFileData = compression.uncompress (reader, this.streamFunction);
 
-          if (!this.streamFunction && this.uncompressedFileData.length !== this.uncompressedSize) {
-              throw new Error("Bug : uncompressed data size mismatch: "+this.uncompressedFileData.length+", "+this.uncompressedSize);
-          }
+         if (!this.streamFunction && this.uncompressedFileData.length !== this.uncompressedSize) {
+            throw new Error("Bug : uncompressed data size mismatch");
+         }
 
          if (this.loadOptions.checkCRC32 && JSZip.prototype.crc32(this.uncompressedFileData) !== this.crc32) {
             throw new Error("Corrupted zip : CRC32 mismatch");
@@ -374,13 +374,13 @@ Dual licenced under the MIT license or GPLv3. See LICENSE.markdown.
    function ZipEntries(data, loadOptions) {
       this.files = [];
       this.loadOptions = loadOptions;
-       if (data) {
-           if (loadOptions.noInflate) {
-               this.loadNoInflate(data);
-           } else {
-               this.load(data);
-           }
-       }
+      if (data) {
+          if (loadOptions.noInflate) {
+                this.loadNoInflate(data);
+          } else {
+                this.load(data);
+          }
+      }
    }
 
    ZipEntries.prototype = {
@@ -455,13 +455,13 @@ Dual licenced under the MIT license or GPLv3. See LICENSE.markdown.
             throw new Error("Multi-volumes zip are not supported");
          }
       },
-       // This gets a previously read-in file.
+      // This gets a previously read-in file.
        getLocalFile : function (fileName) {
            var file;
            for(var i = 0; i < this.files.length; i++) {
                file = this.files[i];
                if (file.fileName == fileName) {
-                   console.log (file, file.uncompressedFileData ? file.uncompressedFileData.length : "not unzipped");
+                   console.log (file, file.data ? file.data.length : "not unzipped");
                    return file;
                }
            }
@@ -473,7 +473,7 @@ Dual licenced under the MIT license or GPLv3. See LICENSE.markdown.
        readLocalFile : function(fileName, streamFunction) {
            var i, file;
            file = this.getLocalFile (fileName);
-           //console.log ("file", fileName, file);
+           console.log ("file", fileName, file);
 
            if (file != null) {
                this.reader.setIndex(file.localHeaderOffset);
@@ -515,7 +515,7 @@ Dual licenced under the MIT license or GPLv3. See LICENSE.markdown.
        * Read the end of central directory.
        */
       readEndOfCentral : function() {
-            // var offset = this.reader.stream.lastIndexOf(JSZip.signature.CENTRAL_DIRECTORY_END);
+           // var offset = this.reader.stream.lastIndexOf(JSZip.signature.CENTRAL_DIRECTORY_END);
             var offset = this.reader.lastIndexOf(JSZip.signature.CENTRAL_DIRECTORY_END);
             if (offset === -1) {
                throw new Error("Corrupted zip : can't find end of central directory");
@@ -554,8 +554,8 @@ Dual licenced under the MIT license or GPLv3. See LICENSE.markdown.
                */
 
                // should look for a zip64 EOCD locator
-                //offset = this.reader.stream.lastIndexOf(JSZip.signature.ZIP64_CENTRAL_DIRECTORY_LOCATOR);
-                offset = this.reader.lastIndexOf(JSZip.signature.ZIP64_CENTRAL_DIRECTORY_LOCATOR);
+               //offset = this.reader.stream.lastIndexOf(JSZip.signature.ZIP64_CENTRAL_DIRECTORY_LOCATOR);
+               offset = this.reader.lastIndexOf(JSZip.signature.ZIP64_CENTRAL_DIRECTORY_LOCATOR);
                if (offset === -1) {
                   throw new Error("Corrupted zip : can't find the ZIP64 end of central directory locator");
                }
@@ -578,12 +578,13 @@ Dual licenced under the MIT license or GPLv3. See LICENSE.markdown.
 
           this.readEndOfCentral();
           this.readCentralDir();
+          console.log (this.files);
       },
 
-       load : function(data) {
-           this.loadNoInflate (data);
-           this.readLocalFiles();
-       }
+      load : function(data) {
+         this.loadNoInflate (data);
+         this.readLocalFiles();
+      }
    };
    // }}} end of ZipEntries
 
@@ -604,8 +605,11 @@ Dual licenced under the MIT license or GPLv3. See LICENSE.markdown.
       }
 
       zipEntries = new ZipEntries(data, options);
+       this.zipEntries = zipEntries;
       files = zipEntries.files;
-      this.zipEntries = zipEntries; // expose zipentries for probing
+       if (VESPER && VESPER.alerts) {
+        alert ("pause for profiling");
+      }
       for (i = 0; i < files.length; i++) {
          input = files[i];
          this.file(input.fileName, input.uncompressedFileData, {
